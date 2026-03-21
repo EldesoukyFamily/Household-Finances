@@ -9,6 +9,7 @@ import UploadTab from '../components/UploadTab'
 import SavingsTab from '../components/SavingsTab'
 import BillsTab from '../components/BillsTab'
 import ChatTab from '../components/ChatTab'
+import DonationsTab from '../components/DonationsTab'
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -17,6 +18,7 @@ const TABS = [
   { id: 'upload',    label: 'Upload' },
   { id: 'savings',   label: 'Savings' },
   { id: 'bills',     label: 'Bill Planner' },
+  { id: 'donations', label: 'Donations' },
   { id: 'chat',      label: 'AI Chat' },
 ]
 
@@ -198,6 +200,7 @@ export default function Dashboard() {
             {tab === 'upload'        && <UploadTab {...sharedProps} onSave={saveTransactions} onReload={loadTransactions} />}
             {tab === 'savings'       && <SavingsTab {...sharedProps} />}
             {tab === 'bills'         && <BillsTab {...sharedProps} onAdd={addBill} onDelete={deleteBill} />}
+            {tab === 'donations'    && <DonationsTab {...sharedProps} onUpdateCategory={updateCategory} />}
             {tab === 'chat'          && <ChatTab {...sharedProps} />}
           </>
         )}
