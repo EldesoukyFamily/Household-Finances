@@ -10,7 +10,7 @@ const ML =     ['Aug-25','Sep-25','Oct-25','Nov-25','Dec-25','Jan-26','Feb-26','
 
 function getCats(txns, ym) {
   const c = {}
-  txns.filter(t=>t.date?.startsWith(ym)).forEach(t=>{c[t.category]=(c[t.category]||0)+parseFloat(t.amount)})
+txns.filter(t=>t.date?.startsWith(ym) && !t.is_business).forEach(t=>{c[t.category]=(c[t.category]||0)+parseFloat(t.amount)})
   return c
 }
 
