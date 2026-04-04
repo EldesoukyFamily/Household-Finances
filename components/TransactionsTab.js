@@ -10,11 +10,13 @@ export default function TransactionsTab({ transactions, onUpdateCategory, onDele
   const [fMo, setFMo] = useState('')
   const [showNR, setShowNR] = useState(false)
   const [showBiz, setShowBiz] = useState(false)
+  const [bizOnly, setBizOnly] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [togglingId, setTogglingId] = useState(null)
 
   let rows = [...transactions]
-  if (!showBiz) rows = rows.filter(t => !t.is_business)
+  if (bizOnly) rows = rows.filter(t => t.is_business)
+  else if (!showBiz) rows = rows.filter(t => !t.is_business)
   if (!showNR) rows = rows.filter(t => !NON_RECURRING.has(t.category))
   if (q) rows = rows.filter(t => t.description?.toLowerCase().includes(q.toLowerCase()) || t.category?.toLowerCase().includes(q.toLowerCase()))
   if (fCat) rows = rows.filter(t => t.category === fCat)
@@ -56,10 +58,16 @@ export default function TransactionsTab({ transactions, onUpdateCategory, onDele
           <input type="checkbox" checked={showNR} onChange={e=>setShowNR(e.target.checked)} />
           Show non-recurring
         </label>
-        <label style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'12px', color: showBiz ? '#f5a623' : '#9499b8', cursor:'pointer' }}>
-          <input type="checkbox" checked={showBiz} onChange={e=>setShowBiz(e.target.checked)} />
+        <label style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'12px', color: showBiz || bizOnly ? '#f5a623' : '#9499b8', cursor:'pointer' }}>
+          <input type="checkbox" checked={showBiz} onChange={e=>{ setShowBiz(e.target.checked); if (!e.target.checked) setBizOnly(false) }} />
           Show business ({bizCount})
         </label>
+        {showBiz && (
+          <label style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'12px', color: bizOnly ? '#f5a623' : '#9499b8', cursor:'pointer' }}>
+            <input type="checkbox" checked={bizOnly} onChange={e=>setBizOnly(e.target.checked)} />
+            Business only
+          </label>
+        )}
         <span style={{ marginLeft:'auto', fontSize:'12px', color:'#9499b8' }}>
           {rows.length} transactions · {fmt(total)}
         </span>
