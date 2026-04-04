@@ -11,7 +11,10 @@ const INCOME =  {'2025-08':19369,'2025-09':19474,'2025-10':24620,'2025-11':19822
 
 function getCats(transactions, ym) {
   const c = {}
-  transactions.filter(t => t.date?.startsWith(ym)).forEach(t => { c[t.category] = (c[t.category]||0) + parseFloat(t.amount) })
+  // ← business transactions excluded from all household calculations
+  transactions
+    .filter(t => t.date?.startsWith(ym) && !t.is_business)
+    .forEach(t => { c[t.category] = (c[t.category]||0) + parseFloat(t.amount) })
   return c
 }
 function regSpend(transactions, ym) {
@@ -53,8 +56,18 @@ export default function DashboardTab({ transactions }) {
     datasets: top6.map(c=>({ label:c.split(' (')[0], data:MONTHS.map(m=>Math.round(getCats(transactions,m)[c]||0)), borderColor:catColor(c), backgroundColor:'transparent', pointRadius:3, tension:.3, borderWidth:2 }))
   }
 
+  // Count excluded business transactions for info banner
+  const bizCount = transactions.filter(t => t.is_business).length
+
   return (
     <div>
+      {bizCount > 0 && (
+        <div style={{ marginBottom:'12px', padding:'8px 14px', borderRadius:'8px', background:'rgba(245,166,35,0.08)', border:'1px solid rgba(245,166,35,0.2)', fontSize:'12px', color:'#f5a623', display:'flex', alignItems:'center', gap:'6px' }}>
+          <span>🏢</span>
+          <span>{bizCount} business transactions excluded from household totals</span>
+        </div>
+      )}
+
       <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'16px'}}>
         {['all',...MONTHS].map((m,i)=>(
           <button key={m} onClick={()=>setSelMo(m)}
