@@ -9,7 +9,6 @@ const ML =     ['Aug-25','Sep-25','Oct-25','Nov-25','Dec-25','Jan-26','Feb-26','
 const INCOME = {'2025-08':19369,'2025-09':19474,'2025-10':24620,'2025-11':19822,'2025-12':20444,'2026-01':22830,'2026-02':18450,'2026-03':18402}
 
 function regSpend(txns, ym) {
-function regSpend(txns, ym) {
   return txns.filter(t=>t.date?.startsWith(ym)&&!NON_RECURRING.has(t.category)&&!t.is_business).reduce((s,t)=>s+parseFloat(t.amount),0)
 }
 
