@@ -114,6 +114,12 @@ export default function Dashboard() {
     setTransactions(prev => prev.filter(t => t.id !== txnId))
   }
 
+  // ← NEW: toggle a transaction as business/LLC expense
+  async function toggleBusiness(txnId, isBusiness) {
+    await supabase.from('transactions').update({ is_business: isBusiness }).eq('id', txnId)
+    setTransactions(prev => prev.map(t => t.id === txnId ? { ...t, is_business: isBusiness } : t))
+  }
+
   async function saveTransactions(newTxns) {
     const rows = newTxns.map(t => ({ ...t, household_id: householdId }))
     const { data } = await supabase.from('transactions').insert(rows).select()
@@ -196,7 +202,7 @@ export default function Dashboard() {
           <>
             {tab === 'dashboard'     && <DashboardTab {...sharedProps} />}
             {tab === 'baseline'      && <BaselineTab {...sharedProps} onUpdateBaseline={updateBaseline} />}
-            {tab === 'transactions'  && <TransactionsTab {...sharedProps} onUpdateCategory={updateCategory} onDelete={deleteTransaction} />}
+            {tab === 'transactions'  && <TransactionsTab {...sharedProps} onUpdateCategory={updateCategory} onDelete={deleteTransaction} onToggleBusiness={toggleBusiness} />}
             {tab === 'upload'        && <UploadTab {...sharedProps} onSave={saveTransactions} onReload={loadTransactions} />}
             {tab === 'savings'       && <SavingsTab {...sharedProps} />}
             {tab === 'bills'         && <BillsTab {...sharedProps} onAdd={addBill} onDelete={deleteBill} />}
