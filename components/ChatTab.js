@@ -1,8 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
-import { NON_RECURRING, fmt, toMonthLabel, INCOME } from '../lib/constants'
+import { NON_RECURRING, fmt, toMonthLabel } from '../lib/constants'
+
+function getIncome(transactions, ym) {
+  return transactions
+    .filter(t => t.date?.startsWith(ym) && t.category === 'Income')
+    .reduce((s, t) => s + parseFloat(t.amount), 0)
+}
 
 function buildContext(transactions, baseline) {
-  // Derive months dynamically from actual transaction dates
   const months = [...new Set(transactions.map(t => t.date?.slice(0,7)).filter(Boolean))].sort()
 
   const catTotals = {}
@@ -10,7 +15,7 @@ function buildContext(transactions, baseline) {
 
   const monthly = months.map(m => {
     const spend = transactions.filter(t=>t.date?.startsWith(m)&&!NON_RECURRING.has(t.category)&&!t.is_business).reduce((s,t)=>s+parseFloat(t.amount),0)
-    const inc = INCOME[m]||0
+    const inc = getIncome(transactions, m)
     return `${m}: income=$${Math.round(inc)} spend=$${Math.round(spend)} net=${Math.round(inc-spend)>=0?'+':''}$${Math.round(inc-spend)}`
   }).join(' | ')
 

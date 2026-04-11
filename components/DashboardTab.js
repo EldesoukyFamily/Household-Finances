@@ -1,9 +1,15 @@
 import { useState } from 'react'
 import { Bar, Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Tooltip, Legend } from 'chart.js'
-import { NON_RECURRING, fmt, fmtS, catColor, toMonthLabel, INCOME } from '../lib/constants'
+import { NON_RECURRING, fmt, fmtS, catColor, toMonthLabel } from '../lib/constants'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Tooltip, Legend)
+
+function getIncome(transactions, ym) {
+  return transactions
+    .filter(t => t.date?.startsWith(ym) && t.category === 'Income')
+    .reduce((s, t) => s + parseFloat(t.amount), 0)
+}
 
 function getCats(transactions, ym) {
   const c = {}
@@ -28,7 +34,7 @@ export default function DashboardTab({ transactions, months = [] }) {
   const ML = months.map(toMonthLabel)
   const [selMo, setSelMo] = useState('all')
   const selMonths = selMo === 'all' ? months : [selMo]
-  const totInc   = selMonths.reduce((s,m)=>s+(INCOME[m]||0),0)
+  const totInc   = selMonths.reduce((s,m)=>s+getIncome(transactions,m),0)
   const totSpend = selMonths.reduce((s,m)=>s+regSpend(transactions,m),0)
   const net = totInc - totSpend
   const n = selMonths.length
@@ -41,9 +47,9 @@ export default function DashboardTab({ transactions, months = [] }) {
   const trendData = {
     labels: ML,
     datasets: [
-      {label:'Income', data:months.map(m=>Math.round(INCOME[m]||0)), backgroundColor:'rgba(45,212,160,.65)', borderRadius:4},
+      {label:'Income', data:months.map(m=>Math.round(getIncome(transactions,m))), backgroundColor:'rgba(45,212,160,.65)', borderRadius:4},
       {label:'Spend',  data:months.map(m=>Math.round(regSpend(transactions,m))), backgroundColor:'rgba(245,166,35,.65)', borderRadius:4},
-      {label:'Net',    data:months.map(m=>Math.round((INCOME[m]||0)-regSpend(transactions,m))), type:'line', borderColor:'#4f8ef7', backgroundColor:'transparent', pointRadius:4, tension:.3, borderWidth:2},
+      {label:'Net',    data:months.map(m=>Math.round(getIncome(transactions,m)-regSpend(transactions,m))), type:'line', borderColor:'#4f8ef7', backgroundColor:'transparent', pointRadius:4, tension:.3, borderWidth:2},
     ]
   }
 

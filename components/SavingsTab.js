@@ -1,8 +1,14 @@
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Tooltip, Legend } from 'chart.js'
-import { NON_RECURRING, fmt, fmtS, toMonthLabel, INCOME } from '../lib/constants'
+import { NON_RECURRING, fmt, fmtS, toMonthLabel } from '../lib/constants'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Tooltip, Legend)
+
+function getIncome(transactions, ym) {
+  return transactions
+    .filter(t => t.date?.startsWith(ym) && t.category === 'Income')
+    .reduce((s, t) => s + parseFloat(t.amount), 0)
+}
 
 function regSpend(txns, ym) {
   return txns.filter(t=>t.date?.startsWith(ym)&&!NON_RECURRING.has(t.category)&&!t.is_business).reduce((s,t)=>s+parseFloat(t.amount),0)
@@ -12,12 +18,12 @@ export default function SavingsTab({ transactions, months = [] }) {
   const ML = months.map(toMonthLabel)
   // Use all months except the current (partial) month for averages
   const valid = months.slice(0, -1).length >= 7 ? months.slice(0, 7) : months.slice(0, -1)
-  const avgInc   = valid.reduce((s,m)=>s+(INCOME[m]||0),0)/7
-  const avgSpend = valid.reduce((s,m)=>s+regSpend(transactions,m),0)/7
+  const avgInc   = valid.reduce((s,m)=>s+getIncome(transactions,m),0)/Math.max(valid.length,1)
+  const avgSpend = valid.reduce((s,m)=>s+regSpend(transactions,m),0)/Math.max(valid.length,1)
   const avgNet   = avgInc - avgSpend
   const gap      = Math.max(0, 1700 - avgNet)
 
-  const nets = months.map(m=>Math.round((INCOME[m]||0)-regSpend(transactions,m)))
+  const nets = months.map(m=>Math.round(getIncome(transactions,m)-regSpend(transactions,m)))
   const chartData = {
     labels: ML,
     datasets: [
