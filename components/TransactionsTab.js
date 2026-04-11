@@ -3,7 +3,7 @@ import { NON_RECURRING, fmt, catColor, ALL_CATEGORIES, toMonthLabel } from '../l
 
 export default function TransactionsTab({ transactions, baseline, onUpdateCategory, onDelete, onToggleBusiness, months = [] }) {
   const ML = months.map(toMonthLabel)
-  const [view, setView]         = useState('expenses') // 'expenses' | 'income' | 'credits'
+  const [view, setView]         = useState('expenses') // 'expenses' | 'income' | 'credits' | 'excluded'
   const [q, setQ]               = useState('')
   const [fCat, setFCat]         = useState('')
   const [fMo, setFMo]           = useState('')
@@ -21,12 +21,16 @@ export default function TransactionsTab({ transactions, baseline, onUpdateCatego
   }
 
   // Partition transactions by type
-  const expenseRows = transactions.filter(t => parseFloat(t.amount) > 0 && t.category !== 'Income')
-  const incomeRows  = transactions.filter(t => t.category === 'Income')
-  const creditRows  = transactions.filter(t => parseFloat(t.amount) < 0)
+  const expenseRows  = transactions.filter(t => parseFloat(t.amount) > 0 && t.category !== 'Income' && t.category !== 'Excluded')
+  const incomeRows   = transactions.filter(t => t.category === 'Income')
+  const creditRows   = transactions.filter(t => parseFloat(t.amount) < 0)
+  const excludedRows = transactions.filter(t => t.category === 'Excluded')
 
   // Apply filters to whichever view is active
-  let rows = view === 'income' ? incomeRows : view === 'credits' ? creditRows : expenseRows
+  let rows = view === 'income'    ? incomeRows
+           : view === 'credits'   ? creditRows
+           : view === 'excluded'  ? excludedRows
+           : expenseRows
 
   if (view === 'expenses') {
     if (bizOnly) rows = rows.filter(t => t.is_business)
@@ -105,6 +109,10 @@ export default function TransactionsTab({ transactions, baseline, onUpdateCatego
     setTogglingId(null)
   }
 
+  async function handleExclude(t) {
+    await onUpdateCategory(t.id, t.category === 'Excluded' ? 'Other' : 'Excluded')
+  }
+
   // Shared tab button style
   const tabBtn = (id, label, count, color) => (
     <button key={id} onClick={() => { setView(id); setEditingId(null) }}
@@ -128,9 +136,10 @@ export default function TransactionsTab({ transactions, baseline, onUpdateCatego
 
       {/* View toggle */}
       <div style={{ display:'flex', gap:'6px', marginBottom:'16px' }}>
-        {tabBtn('expenses', 'Expenses',        expenseRows.length, '#4f8ef7')}
-        {tabBtn('income',   'Income',           incomeRows.length,  '#2dd4a0')}
-        {tabBtn('credits',  'Credits & Returns', creditRows.length,  '#9d7ff4')}
+        {tabBtn('expenses', 'Expenses',         expenseRows.length,  '#4f8ef7')}
+        {tabBtn('income',   'Income',            incomeRows.length,   '#2dd4a0')}
+        {tabBtn('credits',  'Credits & Returns', creditRows.length,   '#9d7ff4')}
+        {tabBtn('excluded', 'Excluded',          excludedRows.length, '#6b7280')}
       </div>
 
       {/* ── INCOME VIEW ─────────────────────────────── */}
@@ -435,6 +444,7 @@ export default function TransactionsTab({ transactions, baseline, onUpdateCatego
                               {togglingId === t.id ? '...' : t.is_business ? 'LLC ✓' : 'Biz'}
                             </button>
                             <button onClick={() => setEditingId(t.id)} style={{ background:'none', border:'1px solid rgba(255,255,255,0.15)', color:'#9499b8', borderRadius:'4px', padding:'3px 8px', cursor:'pointer', fontSize:'11px', marginRight:'4px' }}>Edit</button>
+                            <button onClick={() => handleExclude(t)} title="Hide from all calculations" style={{ background:'none', border:'1px solid rgba(255,255,255,0.1)', color:'#6b7280', borderRadius:'4px', padding:'3px 8px', cursor:'pointer', fontSize:'11px', marginRight:'4px' }}>Hide</button>
                             <button onClick={() => handleDelete(t.id, t.description)} style={{ background:'none', border:'none', color:'#9499b8', cursor:'pointer', fontSize:'15px', lineHeight:1 }}>×</button>
                           </>
                         )}
@@ -444,6 +454,57 @@ export default function TransactionsTab({ transactions, baseline, onUpdateCatego
                 </tbody>
               </table>
               {rows.length === 0 && <div style={{ padding:'40px', textAlign:'center', color:'#9499b8', fontSize:'13px' }}>No transactions found</div>}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── EXCLUDED VIEW ───────────────────────────── */}
+      {view === 'excluded' && (
+        <div>
+          <div style={{ fontSize:'12px', color:'#9499b8', marginBottom:'14px', padding:'10px 14px', background:'rgba(107,114,128,0.08)', borderRadius:'6px', border:'1px solid rgba(107,114,128,0.2)' }}>
+            🚫 These transactions are hidden from all calculations — spending totals, income, charts, and baseline comparisons. To restore a transaction, click <strong style={{color:'#eef0f8'}}>Unhide</strong>.
+          </div>
+          <div style={{ display:'flex', gap:'8px', marginBottom:'14px', alignItems:'center' }}>
+            <input type="text" value={q} onChange={e=>setQ(e.target.value)} placeholder="Search..." style={{ maxWidth:'200px' }} />
+            <select value={fMo} onChange={e=>setFMo(e.target.value)} style={{ maxWidth:'140px' }}>
+              <option value="">All months</option>
+              {months.map((m,i) => <option key={m} value={m}>{ML[i]}</option>)}
+            </select>
+            <span style={{ marginLeft:'auto', fontSize:'12px', color:'#9499b8' }}>{rows.length} hidden transactions</span>
+          </div>
+          <div className="card" style={{ padding:0 }}>
+            <div style={{ overflowY:'auto', maxHeight:'520px' }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th onClick={() => toggleSort('date')} style={{ cursor:'pointer', userSelect:'none' }}>Date <SortIcon col="date" /></th>
+                    <th>Description</th>
+                    <th style={{ textAlign:'right', cursor:'pointer', userSelect:'none' }} onClick={() => toggleSort('amount')}>Amount <SortIcon col="amount" /></th>
+                    <th>Account</th>
+                    <th>Original Category</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(t => (
+                    <tr key={t.id} style={{ opacity:0.6 }}>
+                      <td style={{ fontFamily:'monospace', color:'#9499b8', fontSize:'11.5px' }}>{t.date}</td>
+                      <td style={{ maxWidth:'260px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textDecoration:'line-through', color:'#6b7280' }} title={t.description}>{t.description}</td>
+                      <td style={{ fontFamily:'monospace', textAlign:'right', color:'#6b7280', textDecoration:'line-through' }}>{fmt(Math.abs(parseFloat(t.amount)))}</td>
+                      <td style={{ color:'#6b7280', fontSize:'11.5px' }}>{t.account}</td>
+                      <td><span className="badge" style={{ background:'rgba(107,114,128,0.15)', color:'#6b7280' }}>Excluded</span></td>
+                      <td>
+                        <button onClick={() => handleExclude(t)}
+                          style={{ background:'rgba(45,212,160,0.1)', border:'1px solid rgba(45,212,160,0.3)', color:'#2dd4a0', borderRadius:'4px', padding:'3px 10px', cursor:'pointer', fontSize:'11px', marginRight:'4px' }}>
+                          Unhide
+                        </button>
+                        <button onClick={() => handleDelete(t.id, t.description)} style={{ background:'none', border:'none', color:'#6b7280', cursor:'pointer', fontSize:'15px' }}>×</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {rows.length === 0 && <div style={{ padding:'40px', textAlign:'center', color:'#9499b8', fontSize:'13px' }}>No excluded transactions</div>}
             </div>
           </div>
         </div>

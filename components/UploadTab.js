@@ -13,8 +13,12 @@ function parseAmt(str) {
 
 // Descriptions that are always internal transfers — never import
 const TRANSFER_KEYWORDS = [
-  'KIDS SAVINGS', 'SAVINGS ACCOUNT', 'CRCARDPMT', 'BARCLAYCARD US CREDITCARD',
+  'KIDS SAVINGS', 'SAVINGS ACCOUNT', 'TO: SAVINGS', 'TO SAVINGS',
+  'CRCARDPMT', 'BARCLAYCARD US CREDITCARD',
   'MOBILE PMT', 'AUTOPAY', 'CREDIT CARD PMT', 'AUTOMATIC PAYMENT',
+  'CRDWEB',           // Axos → Chase CC web payment
+  'EPAY CHASE CREDIT', // Axos electronic payment to Chase
+  'FROM: CHECKING',   // Axos internal transfer
 ]
 function isTransfer(desc) {
   const d = (desc || '').toUpperCase()
