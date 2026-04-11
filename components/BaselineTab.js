@@ -1,27 +1,28 @@
 import { useState } from 'react'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Tooltip, Legend } from 'chart.js'
-import { NON_RECURRING, fmt, fmtS, catColor } from '../lib/constants'
+import { NON_RECURRING, fmt, fmtS, toMonthLabel } from '../lib/constants'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Tooltip, Legend)
 
-const MONTHS = ['2025-08','2025-09','2025-10','2025-11','2025-12','2026-01','2026-02','2026-03']
-const ML =     ['Aug-25','Sep-25','Oct-25','Nov-25','Dec-25','Jan-26','Feb-26','Mar-26']
-
 function getCats(txns, ym) {
   const c = {}
-txns.filter(t=>t.date?.startsWith(ym) && !t.is_business).forEach(t=>{c[t.category]=(c[t.category]||0)+parseFloat(t.amount)})
+  txns.filter(t=>t.date?.startsWith(ym) && !t.is_business).forEach(t=>{c[t.category]=(c[t.category]||0)+parseFloat(t.amount)})
   return c
 }
 
-export default function BaselineTab({ transactions, baseline, onUpdateBaseline }) {
+export default function BaselineTab({ transactions, baseline, onUpdateBaseline, months = [] }) {
+  const ML = months.map(toMonthLabel)
   const [selMo, setSelMo] = useState('avg')
   const [editing, setEditing] = useState({})
+
+  // Use all-but-last months for averages (last month is current/partial)
+  const avgMonths = months.slice(0, -1)
 
   function getActual() {
     if (selMo === 'avg') {
       const c = {}
-      MONTHS.slice(0,7).forEach(m=>{ Object.entries(getCats(transactions,m)).forEach(([cat,v])=>{ if(!NON_RECURRING.has(cat)) c[cat]=(c[cat]||0)+v/7 }) })
+      avgMonths.forEach(m=>{ Object.entries(getCats(transactions,m)).forEach(([cat,v])=>{ if(!NON_RECURRING.has(cat)) c[cat]=(c[cat]||0)+v/Math.max(avgMonths.length,1) }) })
       return c
     }
     const c = getCats(transactions, selMo)
@@ -34,7 +35,7 @@ export default function BaselineTab({ transactions, baseline, onUpdateBaseline }
   const totBase   = Object.values(baseline).reduce((s,v)=>s+v,0)
   const totDelta  = totActual - totBase
 
-  const actVals = MONTHS.map(m=>{
+  const actVals = months.map(m=>{
     const c = getCats(transactions,m)
     return Math.round(Object.entries(c).filter(([cat])=>!NON_RECURRING.has(cat)).reduce((s,[,v])=>s+v,0))
   })
@@ -44,7 +45,7 @@ export default function BaselineTab({ transactions, baseline, onUpdateBaseline }
     labels: ML,
     datasets: [
       {label:'Actual spend', data:actVals, backgroundColor:actVals.map(v=>v>baseVal?'rgba(240,98,128,.7)':'rgba(45,212,160,.65)'), borderRadius:4},
-      {label:'Baseline',     data:MONTHS.map(()=>baseVal), type:'line', borderColor:'rgba(255,255,255,0.5)', borderDash:[5,5], pointRadius:0, borderWidth:2},
+      {label:'Baseline',     data:months.map(()=>baseVal), type:'line', borderColor:'rgba(255,255,255,0.5)', borderDash:[5,5], pointRadius:0, borderWidth:2},
     ]
   }
   const chartOpts = {
@@ -73,12 +74,12 @@ export default function BaselineTab({ transactions, baseline, onUpdateBaseline }
         </div>
         <select value={selMo} onChange={e=>setSelMo(e.target.value)} style={{width:'auto',minWidth:'160px'}}>
           <option value="avg">7-month average</option>
-          {MONTHS.map((m,i)=><option key={m} value={m}>{ML[i]}</option>)}
+          {months.map((m,i)=><option key={m} value={m}>{ML[i]}</option>)}
         </select>
       </div>
 
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'10px',marginBottom:'18px'}}>
-        <div className="card"><div className="label">Total actual</div><div className="value c-amber">{fmt(totActual)}</div><div className="sub">{selMo==='avg'?'avg/mo':ML[MONTHS.indexOf(selMo)]}</div></div>
+        <div className="card"><div className="label">Total actual</div><div className="value c-amber">{fmt(totActual)}</div><div className="sub">{selMo==='avg'?'avg/mo':ML[months.indexOf(selMo)]}</div></div>
         <div className="card"><div className="label">Total baseline</div><div className="value c-blue">{fmt(totBase)}</div><div className="sub">monthly target</div></div>
         <div className="card"><div className="label">vs Baseline</div><div className={`value ${totDelta<=0?'c-green':'c-red'}`}>{fmtS(totDelta)}</div><div className="sub">{totDelta<=0?'under budget':'over budget'}</div></div>
       </div>

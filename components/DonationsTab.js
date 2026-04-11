@@ -1,12 +1,9 @@
 import { useState } from 'react'
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js'
-import { fmt, ALL_CATEGORIES } from '../lib/constants'
+import { fmt, ALL_CATEGORIES, toMonthLabel } from '../lib/constants'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend)
-
-const MONTHS = ['2025-08','2025-09','2025-10','2025-11','2025-12','2026-01','2026-02','2026-03']
-const ML =     ['Aug-25','Sep-25','Oct-25','Nov-25','Dec-25','Jan-26','Feb-26','Mar-26']
 
 const DONATION_KEYWORDS = [
   'IRUSA','ISLAMIC RELIEF','ZAKAT','SADAQA','LAUNCHGOOD','GOFUNDME',
@@ -21,12 +18,12 @@ function isDonation(desc) {
   return DONATION_KEYWORDS.some(k => d.includes(k))
 }
 
-export default function DonationsTab({ transactions, onUpdateCategory }) {
+export default function DonationsTab({ transactions, onUpdateCategory, months = [] }) {
+  const ML = months.map(toMonthLabel)
   const [yearFilter, setYearFilter] = useState('all')
   const [editingId, setEditingId] = useState(null)
   const [manualIds, setManualIds] = useState(new Set())
 
-  // All transactions marked as Charitable Giving OR auto-detected as donations
   const donations = transactions.filter(t =>
     t.category === 'Charitable Giving' ||
     isDonation(t.description) ||
@@ -40,8 +37,7 @@ export default function DonationsTab({ transactions, onUpdateCategory }) {
   const ytd2026 = donations.filter(t => t.date?.startsWith('2026')).reduce((s,t) => s+parseFloat(t.amount),0)
   const ytd2025 = donations.filter(t => t.date?.startsWith('2025')).reduce((s,t) => s+parseFloat(t.amount),0)
 
-  // Monthly breakdown for chart
-  const monthlyTotals = MONTHS.map(m =>
+  const monthlyTotals = months.map(m =>
     Math.round(donations.filter(t => t.date?.startsWith(m)).reduce((s,t) => s+parseFloat(t.amount),0))
   )
 
@@ -63,10 +59,8 @@ export default function DonationsTab({ transactions, onUpdateCategory }) {
     }
   }
 
-  // Zakat estimate (2.5% of savings/wealth — simplified)
-  const annualIncome = 20024 * 12  // true avg monthly × 12
+  const annualIncome = 20024 * 12
   const zakatEstimate = Math.round(annualIncome * 0.025)
-  const zakatProgress = Math.min(100, Math.round(ytd2026 / (zakatEstimate / 12 * 3) * 100)) // Q1 progress
 
   async function markAsDonation(txn) {
     setManualIds(prev => new Set([...prev, txn.id]))
@@ -75,7 +69,6 @@ export default function DonationsTab({ transactions, onUpdateCategory }) {
 
   return (
     <div>
-      {/* KPIs */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'10px', marginBottom:'18px' }}>
         <div className="card">
           <div className="label">2026 YTD</div>
@@ -89,7 +82,7 @@ export default function DonationsTab({ transactions, onUpdateCategory }) {
         </div>
         <div className="card">
           <div className="label">Avg per month</div>
-          <div className="value" style={{ color:'#9d7ff4' }}>{fmt(total / Math.max(MONTHS.length,1))}</div>
+          <div className="value" style={{ color:'#9d7ff4' }}>{fmt(total / Math.max(months.length,1))}</div>
           <div className="sub">across all months</div>
         </div>
         <div className="card">
@@ -100,7 +93,6 @@ export default function DonationsTab({ transactions, onUpdateCategory }) {
       </div>
 
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'18px' }}>
-        {/* Chart */}
         <div className="card">
           <div className="label" style={{ marginBottom:'8px' }}>Monthly donations</div>
           <div style={{ height:'200px' }}>
@@ -108,7 +100,6 @@ export default function DonationsTab({ transactions, onUpdateCategory }) {
           </div>
         </div>
 
-        {/* Zakat tracker */}
         <div className="card">
           <div className="label" style={{ marginBottom:'12px' }}>Zakat tracker</div>
           <div style={{ fontSize:'12.5px', color:'#9499b8', marginBottom:'16px', lineHeight:'1.7' }}>
@@ -128,7 +119,7 @@ export default function DonationsTab({ transactions, onUpdateCategory }) {
           </div>
 
           <div className="alert alert-info" style={{ marginTop:'12px', fontSize:'12px' }}>
-            Note: Zakat calculation depends on your nisab threshold and full asset picture. This is an income-based estimate only — consult your calculation method for accuracy.
+            Note: Zakat calculation depends on your nisab threshold and full asset picture. This is an income-based estimate only.
           </div>
 
           <div style={{ marginTop:'14px' }}>
@@ -149,7 +140,6 @@ export default function DonationsTab({ transactions, onUpdateCategory }) {
         </div>
       </div>
 
-      {/* Transaction list */}
       <div className="card">
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'14px' }}>
           <div className="label">Donation transactions</div>
@@ -165,8 +155,7 @@ export default function DonationsTab({ transactions, onUpdateCategory }) {
 
         {filtered.length === 0 ? (
           <div style={{ padding:'30px', textAlign:'center', color:'#9499b8', fontSize:'13px' }}>
-            No donation transactions found yet.<br/>
-            <span style={{ fontSize:'12px' }}>Upload your March statements to see recent donations, or mark transactions below as donations.</span>
+            No donation transactions found yet.
           </div>
         ) : (
           <div style={{ overflowY:'auto', maxHeight:'400px' }}>

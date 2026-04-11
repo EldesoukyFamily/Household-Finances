@@ -164,7 +164,10 @@ export default function Dashboard() {
     )
   }
 
-  const sharedProps = { transactions, baseline, bills, householdId, joinCode }
+  // Derive sorted month list from actual transaction dates — no hardcoding needed
+  const months = [...new Set(transactions.map(t => t.date?.slice(0, 7)).filter(Boolean))].sort()
+
+  const sharedProps = { transactions, baseline, bills, householdId, joinCode, months }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>

@@ -1,30 +1,28 @@
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Tooltip, Legend } from 'chart.js'
-import { NON_RECURRING, fmt, fmtS } from '../lib/constants'
+import { NON_RECURRING, fmt, fmtS, toMonthLabel, INCOME } from '../lib/constants'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Tooltip, Legend)
-
-const MONTHS = ['2025-08','2025-09','2025-10','2025-11','2025-12','2026-01','2026-02','2026-03']
-const ML =     ['Aug-25','Sep-25','Oct-25','Nov-25','Dec-25','Jan-26','Feb-26','Mar-26']
-const INCOME = {'2025-08':19369,'2025-09':19474,'2025-10':24620,'2025-11':19822,'2025-12':20444,'2026-01':22830,'2026-02':18450,'2026-03':18402}
 
 function regSpend(txns, ym) {
   return txns.filter(t=>t.date?.startsWith(ym)&&!NON_RECURRING.has(t.category)&&!t.is_business).reduce((s,t)=>s+parseFloat(t.amount),0)
 }
 
-export default function SavingsTab({ transactions }) {
-  const valid = MONTHS.slice(0,7)
+export default function SavingsTab({ transactions, months = [] }) {
+  const ML = months.map(toMonthLabel)
+  // Use all months except the current (partial) month for averages
+  const valid = months.slice(0, -1).length >= 7 ? months.slice(0, 7) : months.slice(0, -1)
   const avgInc   = valid.reduce((s,m)=>s+(INCOME[m]||0),0)/7
   const avgSpend = valid.reduce((s,m)=>s+regSpend(transactions,m),0)/7
   const avgNet   = avgInc - avgSpend
   const gap      = Math.max(0, 1700 - avgNet)
 
-  const nets = MONTHS.map(m=>Math.round((INCOME[m]||0)-regSpend(transactions,m)))
+  const nets = months.map(m=>Math.round((INCOME[m]||0)-regSpend(transactions,m)))
   const chartData = {
     labels: ML,
     datasets: [
       {label:'Net surplus', data:nets, backgroundColor:nets.map(v=>v>=1700?'rgba(45,212,160,.7)':v>=0?'rgba(79,142,247,.7)':'rgba(240,98,128,.7)'), borderRadius:4},
-      {label:'$1,700 target', data:MONTHS.map(()=>1700), type:'line', borderColor:'rgba(245,166,35,.8)', borderDash:[5,5], pointRadius:0, borderWidth:2},
+      {label:'$1,700 target', data:months.map(()=>1700), type:'line', borderColor:'rgba(245,166,35,.8)', borderDash:[5,5], pointRadius:0, borderWidth:2},
     ]
   }
   const chartOpts = {

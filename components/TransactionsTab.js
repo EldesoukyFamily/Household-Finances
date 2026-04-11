@@ -1,10 +1,8 @@
 import { useState } from 'react'
-import { NON_RECURRING, fmt, catColor, ALL_CATEGORIES } from '../lib/constants'
+import { NON_RECURRING, fmt, catColor, ALL_CATEGORIES, toMonthLabel } from '../lib/constants'
 
-const MONTHS = ['2025-08','2025-09','2025-10','2025-11','2025-12','2026-01','2026-02','2026-03']
-const ML =     ['Aug-25','Sep-25','Oct-25','Nov-25','Dec-25','Jan-26','Feb-26','Mar-26']
-
-export default function TransactionsTab({ transactions, baseline, onUpdateCategory, onDelete, onToggleBusiness }) {
+export default function TransactionsTab({ transactions, baseline, onUpdateCategory, onDelete, onToggleBusiness, months = [] }) {
+  const ML = months.map(toMonthLabel)
   const [q, setQ] = useState('')
   const [fCat, setFCat] = useState('')
   const [fMo, setFMo] = useState('')
@@ -44,8 +42,8 @@ export default function TransactionsTab({ transactions, baseline, onUpdateCatego
 
   // Baseline chart
   const baselineAmt = baseline?.[fCat] || 0
-  const chartMonths = fMo ? [fMo] : MONTHS
-  const chartLabels = fMo ? [ML[MONTHS.indexOf(fMo)]] : ML
+  const chartMonths = fMo ? [fMo] : months
+  const chartLabels = fMo ? [ML[months.indexOf(fMo)]] : ML
   const chartActuals = chartMonths.map(m =>
     transactions
       .filter(t => t.date?.startsWith(m) && t.category === fCat && !t.is_business)
@@ -86,7 +84,7 @@ export default function TransactionsTab({ transactions, baseline, onUpdateCatego
         </select>
         <select value={fMo} onChange={e=>setFMo(e.target.value)} style={{ maxWidth:'140px' }}>
           <option value="">All months</option>
-          {MONTHS.map((m,i) => <option key={m} value={m}>{ML[i]}</option>)}
+          {months.map((m,i) => <option key={m} value={m}>{ML[i]}</option>)}
         </select>
         <label style={{ display:'flex', alignItems:'center', gap:'6px', fontSize:'12px', color:'#9499b8', cursor:'pointer', marginLeft:'4px' }}>
           <input type="checkbox" checked={showNR} onChange={e=>setShowNR(e.target.checked)} />

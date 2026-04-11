@@ -1,31 +1,33 @@
 import { useState, useRef, useEffect } from 'react'
-import { NON_RECURRING, fmt } from '../lib/constants'
-
-const MONTHS = ['2025-08','2025-09','2025-10','2025-11','2025-12','2026-01','2026-02','2026-03']
-const INCOME = {'2025-08':19369.17,'2025-09':19474.04,'2025-10':24619.86,'2025-11':19822.19,'2025-12':20444.38,'2026-01':22829.87,'2026-02':18449.52,'2026-03':9340.22}
+import { NON_RECURRING, fmt, toMonthLabel, INCOME } from '../lib/constants'
 
 function buildContext(transactions, baseline) {
+  // Derive months dynamically from actual transaction dates
+  const months = [...new Set(transactions.map(t => t.date?.slice(0,7)).filter(Boolean))].sort()
+
   const catTotals = {}
   transactions.forEach(t => { catTotals[t.category] = (catTotals[t.category]||0) + parseFloat(t.amount) })
 
-  const monthly = MONTHS.map(m => {
-    const spend = transactions.filter(t=>t.date?.startsWith(m)&&!NON_RECURRING.has(t.category)).reduce((s,t)=>s+parseFloat(t.amount),0)
+  const monthly = months.map(m => {
+    const spend = transactions.filter(t=>t.date?.startsWith(m)&&!NON_RECURRING.has(t.category)&&!t.is_business).reduce((s,t)=>s+parseFloat(t.amount),0)
     const inc = INCOME[m]||0
     return `${m}: income=$${Math.round(inc)} spend=$${Math.round(spend)} net=${Math.round(inc-spend)>=0?'+':''}$${Math.round(inc-spend)}`
   }).join(' | ')
 
   const cats = Object.entries(catTotals).sort((a,b)=>b[1]-a[1])
-    .map(([c,v])=>`${c}: ${fmt(v)} total (${fmt(v/8)}/mo)`).join('\n')
+    .map(([c,v])=>`${c}: ${fmt(v)} total (${fmt(v/Math.max(months.length,1))}/mo)`).join('\n')
 
   const blStr = Object.entries(baseline).sort((a,b)=>b[1]-a[1])
     .map(([c,v])=>`${c}: ${fmt(v)}`).join(', ')
 
-  return `You are a personal finance assistant for this household. Real data Aug 2025–Mar 2026 (V5).
+  const dateRange = months.length ? `${toMonthLabel(months[0])}–${toMonthLabel(months[months.length-1])}` : 'all months'
+
+  return `You are a personal finance assistant for this household. Real data ${dateRange} (V5).
 
 MONTHLY (income/spend/net):
 ${monthly}
 
-CATEGORY TOTALS (8 months, avg/mo):
+CATEGORY TOTALS (${months.length} months, avg/mo):
 ${cats}
 
 BASELINE TARGETS: ${blStr}

@@ -1,13 +1,9 @@
 import { useState } from 'react'
 import { Bar, Line } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Tooltip, Legend } from 'chart.js'
-import { NON_RECURRING, fmt, fmtS, catColor } from '../lib/constants'
+import { NON_RECURRING, fmt, fmtS, catColor, toMonthLabel, INCOME } from '../lib/constants'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Tooltip, Legend)
-
-const MONTHS = ['2025-08','2025-09','2025-10','2025-11','2025-12','2026-01','2026-02','2026-03']
-const ML =     ['Aug-25','Sep-25','Oct-25','Nov-25','Dec-25','Jan-26','Feb-26','Mar-26']
-const INCOME =  {'2025-08':19369,'2025-09':19474,'2025-10':24620,'2025-11':19822,'2025-12':20444,'2026-01':22830,'2026-02':18450,'2026-03':18402}
 
 function getCats(transactions, ym) {
   const c = {}
@@ -28,16 +24,17 @@ const OPTS = {
           y:{ticks:{color:'#9499b8',font:{size:11},callback:v=>'$'+Math.round(Math.abs(v)/1000)+'k'},grid:{color:'rgba(255,255,255,.04)'}}}
 }
 
-export default function DashboardTab({ transactions }) {
+export default function DashboardTab({ transactions, months = [] }) {
+  const ML = months.map(toMonthLabel)
   const [selMo, setSelMo] = useState('all')
-  const months = selMo === 'all' ? MONTHS : [selMo]
-  const totInc   = months.reduce((s,m)=>s+(INCOME[m]||0),0)
-  const totSpend = months.reduce((s,m)=>s+regSpend(transactions,m),0)
+  const selMonths = selMo === 'all' ? months : [selMo]
+  const totInc   = selMonths.reduce((s,m)=>s+(INCOME[m]||0),0)
+  const totSpend = selMonths.reduce((s,m)=>s+regSpend(transactions,m),0)
   const net = totInc - totSpend
-  const n = months.length
+  const n = selMonths.length
 
   const cats = {}
-  months.forEach(m=>{ Object.entries(getCats(transactions,m)).forEach(([c,v])=>{ if(!NON_RECURRING.has(c)) cats[c]=(cats[c]||0)+v }) })
+  selMonths.forEach(m=>{ Object.entries(getCats(transactions,m)).forEach(([c,v])=>{ if(!NON_RECURRING.has(c)) cats[c]=(cats[c]||0)+v }) })
   const sortedCats = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,12)
   const maxCat = sortedCats[0]?.[1]||1
 
@@ -69,7 +66,7 @@ export default function DashboardTab({ transactions }) {
       )}
 
       <div style={{display:'flex',gap:'5px',flexWrap:'wrap',marginBottom:'16px'}}>
-        {['all',...MONTHS].map((m,i)=>(
+        {['all',...months].map((m,i)=>(
           <button key={m} onClick={()=>setSelMo(m)}
             style={{padding:'4px 11px',borderRadius:'20px',border:`1px solid ${selMo===m?'#4f8ef7':'rgba(255,255,255,0.1)'}`,
               background:selMo===m?'#4f8ef7':'none',color:selMo===m?'#fff':'#9499b8',fontSize:'12px',fontWeight:'500',cursor:'pointer'}}>
