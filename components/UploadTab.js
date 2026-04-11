@@ -1,6 +1,17 @@
 import { useState, useRef } from 'react'
 import { autoCategorize, fmt, ALL_CATEGORIES } from '../lib/constants'
 
+// Descriptions that are always internal transfers — never import as expenses
+const TRANSFER_SKIP = [
+  'KIDS SAVINGS','SAVINGS ACCOUNT','CRCARDPMT','BARCLAYCARD','MOBILE PMT',
+  'AUTOPAY','CREDIT CARD PMT','CHASE CREDIT','CAPITAL ONE','CREDITCARD',
+]
+
+function isTransfer(desc) {
+  const d = desc.toUpperCase()
+  return TRANSFER_SKIP.some(k => d.includes(k))
+}
+
 function parseCSV(text, fname) {
   const fn = fname.toUpperCase()
   const lines = text.split('\n').map(l => l.trim()).filter(l => l)
@@ -21,63 +32,86 @@ function parseCSV(text, fname) {
     try {
       let date='', desc='', amount=0, account=''
 
-      // ── Capital One 360 Checking (new format: Account Number, Transaction Description, Transaction Date, Transaction Type, Transaction Amount)
-      if (row['transaction description'] && row['transaction type']) {
+      // ── Format: separate "amount debit" + "amount credit" columns (Capital One 360, Axos, etc.)
+      const hasDebitCol = heads.some(h => h.includes('amount debit') || h === 'amount de')
+      const hasCreditCol = heads.some(h => h.includes('amount credit'))
+
+      if (hasDebitCol || hasCreditCol) {
+        // Find actual column keys (handles leading/trailing spaces in headers)
+        const debitKey  = heads.find(h => h.includes('amount debit') || h === 'amount de') || ''
+        const creditKey = heads.find(h => h.includes('amount credit')) || ''
+        const dateKey   = heads.find(h => h === 'date' || h.includes('transaction date')) || 'date'
+        const descKey   = heads.find(h => h === 'description' || h.includes('transaction description')) || 'description'
+
+        date = row[dateKey] || ''
+        desc = row[descKey] || ''
+        if (isTransfer(desc)) continue
+
+        const debitAmt  = parseFloat(row[debitKey]  || '0') || 0
+        const creditAmt = parseFloat(row[creditKey] || '0') || 0
+        const typ = (row['transaction type'] || row['type'] || '').toLowerCase()
+
+        if (debitAmt > 0) {
+          // It's an expense/payment
+          amount = debitAmt
+        } else if (creditAmt > 0) {
+          // It's a credit — import as negative (reduces spending), but skip payroll/income
+          const isPayroll = desc.toUpperCase().includes('PAYROLL') || desc.toUpperCase().includes('DIRECT DEP')
+          if (isPayroll) continue   // Income — not a transaction expense
+          amount = -creditAmt       // Negative = refund/credit
+        } else {
+          continue
+        }
+
+        account = fn.includes('AXOS') ? (fn.includes('SAVING') ? 'Axos Savings' : 'Axos Checking')
+                : fn.includes('SAVING') ? 'CapOne Savings'
+                : 'CapOne Checking'
+
+      // ── Capital One credit card CSV (single amount column)
+      } else if (row['transaction description'] && row['transaction type'] && !hasDebitCol) {
         date = row['transaction date'] || ''
         desc = row['transaction description'] || ''
+        if (isTransfer(desc)) continue
         const typ = (row['transaction type']||'').toLowerCase()
-        if (typ !== 'debit') continue
-        amount = parseFloat(row['transaction amount']||'0')
-        if (!amount || amount <= 0) continue
-        // Exclude internal transfers to savings/kids accounts and CC payments
-        const skip = ['KIDS SAVINGS','SAVINGS ACCOUNT','CRCARDPMT','BARCLAYCARD','MOBILE PMT','AUTOPAY','CREDIT CARD PMT']
-        if (skip.some(k => desc.toUpperCase().includes(k))) continue
-        account = 'CapOne Checking'
-
-      // ── Capital One credit card CSV
-      } else if (fn.includes('VENTUREX') || fn.includes('VENTURE') || fn.includes('CAPITALONE') || fn.includes('CAPITAL_ONE')) {
-        date = row['transaction date'] || row['date'] || ''
-        desc = row['transaction description'] || row['description'] || ''
-        amount = parseFloat(row['transaction amount'] || row['debit'] || row['amount'] || '0')
-        const tt = (row['transaction type']||'').toLowerCase()
-        if (tt === 'credit') continue
-        if (amount <= 0) continue
-        const skip = ['CRCARDPMT','BARCLAYCARD','MOBILE PMT','AUTOPAY']
-        if (skip.some(k => desc.toUpperCase().includes(k))) continue
+        const rawAmt = parseFloat(row['transaction amount']||'0')
+        if (typ === 'debit' || rawAmt < 0) {
+          amount = Math.abs(rawAmt)
+          if (!amount) continue
+        } else if (typ === 'credit' || rawAmt > 0) {
+          amount = -Math.abs(rawAmt)  // Credit/refund
+        } else continue
         account = fn.includes('CHECKING') ? 'CapOne Checking' : fn.includes('SAVINGS') ? 'CapOne Savings' : 'Venture X'
 
-      // ── Chase (two formats: single Amount column with negatives, OR separate Debit column)
-      } else if (fn.includes('CHASE') || row['card no.'] !== undefined || row['debit'] !== undefined && row['posted date'] !== undefined) {
+      // ── Chase (single Amount column: negative = purchase, positive = credit/refund)
+      } else if (fn.includes('CHASE') || row['card no.'] !== undefined || (row['debit'] !== undefined && row['posted date'] !== undefined)) {
         date = row['transaction date'] || row['date'] || ''
         desc = row['description'] || ''
-        // Format 1: separate Debit column (new Chase format)
+        if (isTransfer(desc)) continue
+        const tt = (row['type']||'').toLowerCase()
+        if (tt === 'payment') continue  // Skip CC payments
+
+        // Format 1: separate Debit column
         if (row['debit'] !== undefined && row['debit'] !== '') {
           amount = parseFloat(row['debit'] || '0')
           if (!amount || amount <= 0) continue
         } else {
-          // Format 2: single Amount column (negative = charge)
-          amount = parseFloat(row['amount'] || '0')
-          if (amount >= 0) continue
-          amount = Math.abs(amount)
+          // Format 2: single Amount column (negative = charge, positive = credit/refund)
+          const rawAmt = parseFloat(row['amount'] || '0')
+          if (rawAmt < 0) {
+            amount = Math.abs(rawAmt)   // Normal purchase
+          } else if (rawAmt > 0 && tt === 'adjustment') {
+            amount = -rawAmt            // Credit/refund — reduces spending
+          } else {
+            continue                    // Zero or unhandled positive
+          }
         }
-        const tt = (row['type']||row['category']||'').toLowerCase()
-        if (tt === 'payment') continue
         account = fn.includes('SAPPHIRE') ? 'Chase Sapphire' : fn.includes('AMAZON') ? 'Chase Amazon' : 'Chase Sapphire'
-
-      // ── Axos
-      } else if (fn.includes('AXOS')) {
-        date = row[' date'] || row['date'] || ''
-        desc = row['description'] || ''
-        amount = parseFloat(row[' amount debit'] || row['amount debit'] || '0')
-        if (!amount || amount <= 0) continue
-        const skip = ['CHASE CREDIT','CAPITAL ONE','BARCLAYS','CREDITCARD','AUTOPAY']
-        if (skip.some(k => desc.toUpperCase().includes(k))) continue
-        account = fn.includes('SAVING') ? 'Axos Savings' : 'Axos Checking'
 
       // ── Barclays
       } else if (fn.includes('BARCLAY')) {
         date = row['transaction date'] || row['date'] || ''
         desc = row['description'] || ''
+        if (isTransfer(desc)) continue
         amount = parseFloat(row['amount'] || '0')
         if ((row['category']||'').toUpperCase() === 'CREDIT' || amount >= 0) continue
         amount = Math.abs(amount); account = 'Barclays'
@@ -91,7 +125,7 @@ function parseCSV(text, fname) {
 
       } else continue
 
-      if (!date || !desc || !amount) continue
+      if (!date || !desc || amount === 0) continue
 
       // Normalize date to YYYY-MM-DD
       let d
@@ -186,12 +220,13 @@ export default function UploadTab({ transactions, onSave }) {
           <div style={{ borderTop:'1px solid rgba(255,255,255,0.07)', marginTop:'14px', paddingTop:'12px' }}>
             <div className="label" style={{ marginBottom:'6px' }}>Smart rules</div>
             <div style={{ fontSize:'12px', color:'#9499b8', lineHeight:'1.8' }}>
+              Credits & refunds → imported as negative amounts<br/>
+              Payroll deposits → excluded (income tracked separately)<br/>
               Cultural Care → Childcare & Education<br/>
               Truist → Mortgage & Housing<br/>
               Zelle Nicoly/Anne → Childcare<br/>
               Zelle Mirian → Home Services<br/>
-              Kids Savings transfers → excluded<br/>
-              CC payments → excluded
+              CC payments & transfers → excluded
             </div>
           </div>
         </div>
@@ -202,7 +237,7 @@ export default function UploadTab({ transactions, onSave }) {
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px' }}>
             <div>
               <div style={{ fontSize:'14px', fontWeight:'600' }}>{staged.length} new transactions to review</div>
-              <div style={{ fontSize:'12px', color:'#9499b8' }}>Click any category badge to change it before saving</div>
+              <div style={{ fontSize:'12px', color:'#9499b8' }}>Credits show as negative amounts (they reduce your spending totals)</div>
             </div>
             <div style={{ display:'flex', gap:'8px' }}>
               <button className="btn-outline" onClick={()=>{setStaged([]);setStatus('')}} style={{ padding:'6px 12px', fontSize:'12px' }}>Discard</button>
@@ -219,7 +254,9 @@ export default function UploadTab({ transactions, onSave }) {
                   <tr key={i}>
                     <td style={{ fontFamily:'monospace', fontSize:'11.5px', color:'#9499b8' }}>{t.date}</td>
                     <td style={{ maxWidth:'240px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.description}</td>
-                    <td style={{ fontFamily:'monospace', textAlign:'right' }}>{fmt(t.amount)}</td>
+                    <td style={{ fontFamily:'monospace', textAlign:'right', color: t.amount < 0 ? '#2dd4a0' : 'inherit' }}>
+                      {t.amount < 0 ? `−${fmt(Math.abs(t.amount))}` : fmt(t.amount)}
+                    </td>
                     <td style={{ fontSize:'11.5px', color:'#9499b8' }}>{t.account}</td>
                     <td>
                       <select value={t.category} onChange={e=>updateStagedCat(i,e.target.value)} style={{ fontSize:'11.5px', padding:'3px 6px', width:'auto', minWidth:'150px' }}>
