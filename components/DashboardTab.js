@@ -41,16 +41,16 @@ export default function DashboardTab({ transactions, months = [] }) {
   const trendData = {
     labels: ML,
     datasets: [
-      {label:'Income', data:MONTHS.map(m=>Math.round(INCOME[m]||0)), backgroundColor:'rgba(45,212,160,.65)', borderRadius:4},
-      {label:'Spend',  data:MONTHS.map(m=>Math.round(regSpend(transactions,m))), backgroundColor:'rgba(245,166,35,.65)', borderRadius:4},
-      {label:'Net',    data:MONTHS.map(m=>Math.round((INCOME[m]||0)-regSpend(transactions,m))), type:'line', borderColor:'#4f8ef7', backgroundColor:'transparent', pointRadius:4, tension:.3, borderWidth:2},
+      {label:'Income', data:months.map(m=>Math.round(INCOME[m]||0)), backgroundColor:'rgba(45,212,160,.65)', borderRadius:4},
+      {label:'Spend',  data:months.map(m=>Math.round(regSpend(transactions,m))), backgroundColor:'rgba(245,166,35,.65)', borderRadius:4},
+      {label:'Net',    data:months.map(m=>Math.round((INCOME[m]||0)-regSpend(transactions,m))), type:'line', borderColor:'#4f8ef7', backgroundColor:'transparent', pointRadius:4, tension:.3, borderWidth:2},
     ]
   }
 
   const top6 = ['Mortgage & Housing','Shopping','Car Payments','Groceries & Household','Dining & Food','Childcare & Education']
   const catTrendData = {
     labels: ML,
-    datasets: top6.map(c=>({ label:c.split(' (')[0], data:MONTHS.map(m=>Math.round(getCats(transactions,m)[c]||0)), borderColor:catColor(c), backgroundColor:'transparent', pointRadius:3, tension:.3, borderWidth:2 }))
+    datasets: top6.map(c=>({ label:c.split(' (')[0], data:months.map(m=>Math.round(getCats(transactions,m)[c]||0)), borderColor:catColor(c), backgroundColor:'transparent', pointRadius:3, tension:.3, borderWidth:2 }))
   }
 
   // Count excluded business transactions for info banner
