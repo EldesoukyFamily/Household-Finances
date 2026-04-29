@@ -260,6 +260,10 @@ export default function UploadTab({ transactions, onSave }) {
   function updateStagedCat(idx, cat) { setStaged(prev => prev.map((t, i) => i === idx ? { ...t, category: cat } : t)) }
   function removeStaged(idx) { setStaged(prev => prev.filter((_, i) => i !== idx)) }
 
+  const income   = staged.filter(t => t.category === 'Income')
+  const credits  = staged.filter(t => t.amount < 0 && t.category !== 'Income')
+  const expenses = staged.filter(t => t.amount > 0 && t.category !== 'Income')
+
   // ── Mortgage auto-generator ──────────────────────────────────────────────
   const MORTGAGE_AMOUNT = 7600
 
@@ -299,8 +303,6 @@ export default function UploadTab({ transactions, onSave }) {
     setStaged(prev => [...prev, ...mortgageTxns].sort((a,b) => b.date.localeCompare(a.date)))
     setStatus(`Added ${mortgageTxns.length} mortgage entries to review queue — save to confirm.`)
   }
-  const credits = staged.filter(t => t.amount < 0 && t.category !== 'Income')
-  const expenses = staged.filter(t => t.amount > 0 && t.category !== 'Income')
 
   return (
     <div>
