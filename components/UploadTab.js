@@ -182,7 +182,7 @@ function parseCSV(text, fname) {
         d = `${yr}-${p[0].padStart(2, '0')}-${p[1].padStart(2, '0')}`
       } else continue
 
-      if (!d || d < '2025-08-01') continue
+      if (!d || d < '2025-09-01') continue
 
       txns.push({
         date: d,
