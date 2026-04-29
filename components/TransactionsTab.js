@@ -23,7 +23,7 @@ export default function TransactionsTab({ transactions, baseline, onUpdateCatego
   // Partition transactions by type
   const expenseRows  = transactions.filter(t => parseFloat(t.amount) > 0 && t.category !== 'Income' && t.category !== 'Excluded')
   const incomeRows   = transactions.filter(t => t.category === 'Income')
-  const creditRows   = transactions.filter(t => parseFloat(t.amount) < 0)
+  const creditRows   = transactions.filter(t => parseFloat(t.amount) < 0 && t.category !== 'Excluded')
   const excludedRows = transactions.filter(t => t.category === 'Excluded')
 
   // Apply filters to whichever view is active

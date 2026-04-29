@@ -14,6 +14,8 @@ const TRANSFER_KEYWORDS = [
   'KIDS SAVINGS', 'SAVINGS ACCOUNT', 'TO: SAVINGS', 'TO SAVINGS',
   '360 PERFORMANCE SAVINGS',    // CapOne internal savings transfer
   'CRCARDPMT',                  // CC payment
+  'CAPITAL ONE MOBILE PYMT',    // Venture X / CapOne CC payment
+  'CAPITAL ONE MOBILE PMT',     // alternate spelling
   'BARCLAYCARD US CREDITCARD',  // Barclays CC payment
   'MOBILE PMT',                 // CapOne mobile CC payment
   'AUTOPAY',                    // auto CC payment
