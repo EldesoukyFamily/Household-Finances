@@ -261,38 +261,44 @@ export default function UploadTab({ transactions, onSave }) {
   function removeStaged(idx) { setStaged(prev => prev.filter((_, i) => i !== idx)) }
 
   // ── Mortgage auto-generator ──────────────────────────────────────────────
-  // Finds months with no Truist Mortgage transaction and offers to add them
   const MORTGAGE_AMOUNT = 7600
 
-  function getMissingMortgageMonths() {
-    const allMonths = [...new Set(transactions.map(t => t.date?.slice(0,7)).filter(Boolean))].sort()
-    const hasMortgage = new Set(
-      transactions
-        .filter(t => t.account === 'Truist' || t.category === 'Mortgage & Housing' && t.account === 'Truist')
-        .map(t => t.date?.slice(0,7))
-    )
-    return allMonths.filter(m => !hasMortgage.has(m) && m >= '2025-09')
+  function getAllMortgageMonths() {
+    // Generate all months from Sep 2025 to current month
+    const months = []
+    let d = new Date(2025, 8, 1) // Sep 2025
+    const now = new Date()
+    while (d <= now) {
+      months.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)
+      d.setMonth(d.getMonth()+1)
+    }
+    return months
   }
 
   function addMortgageMonths() {
-    const missing = getMissingMortgageMonths()
-    if (!missing.length) return
-    const mortgageTxns = missing.map(m => ({
-      date: `${m}-05`,   // 5th of each month
-      description: 'Truist Mortgage Payment',
-      amount: MORTGAGE_AMOUNT,
-      account: 'Truist',
-      category: 'Mortgage & Housing',
-    }))
+    const allMonths = getAllMortgageMonths()
     const existing = new Set(transactions.map(t => `${t.date}|${t.description}|${t.amount}`))
-    const newOnes = mortgageTxns.filter(t => !existing.has(`${t.date}|${t.description}|${t.amount}`))
-    if (newOnes.length) {
-      setStaged(prev => [...prev, ...newOnes].sort((a,b) => b.date.localeCompare(a.date)))
-      setStatus(`Added ${newOnes.length} mortgage entries to review queue.`)
-    }
-  }
+    const alreadyHas = new Set(
+      transactions.filter(t => t.account === 'Truist').map(t => t.date?.slice(0,7))
+    )
+    const mortgageTxns = allMonths
+      .filter(m => !alreadyHas.has(m))
+      .map(m => ({
+        date: `${m}-05`,
+        description: 'Truist Mortgage Payment',
+        amount: MORTGAGE_AMOUNT,
+        account: 'Truist',
+        category: 'Mortgage & Housing',
+      }))
+      .filter(t => !existing.has(`${t.date}|${t.description}|${t.amount}`))
 
-  const missingMortgageMonths = getMissingMortgageMonths()
+    if (!mortgageTxns.length) {
+      setStatus('All mortgage months already added.')
+      return
+    }
+    setStaged(prev => [...prev, ...mortgageTxns].sort((a,b) => b.date.localeCompare(a.date)))
+    setStatus(`Added ${mortgageTxns.length} mortgage entries to review queue — save to confirm.`)
+  }
   const credits = staged.filter(t => t.amount < 0 && t.category !== 'Income')
   const expenses = staged.filter(t => t.amount > 0 && t.category !== 'Income')
 
@@ -341,26 +347,19 @@ export default function UploadTab({ transactions, onSave }) {
         </div>
       </div>
 
-      {/* Mortgage auto-generator */}
-      {missingMortgageMonths.length > 0 && (
-        <div className="card" style={{ marginBottom:'14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'16px' }}>
-          <div>
-            <div style={{ fontSize:'13px', fontWeight:'600', marginBottom:'3px' }}>
-              🏠 Missing mortgage payments
-            </div>
-            <div style={{ fontSize:'12px', color:'#9499b8' }}>
-              No Truist entry found for: <strong style={{ color:'#eef0f8' }}>{missingMortgageMonths.map(m => {
-                const [y,mo] = m.split('-')
-                return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(mo)-1]+'-'+y.slice(2)
-              }).join(', ')}</strong>
-            </div>
+      {/* Mortgage auto-generator — always visible */}
+      <div className="card" style={{ marginBottom:'14px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'16px' }}>
+        <div>
+          <div style={{ fontSize:'13px', fontWeight:'600', marginBottom:'3px' }}>🏠 Truist Mortgage</div>
+          <div style={{ fontSize:'12px', color:'#9499b8' }}>
+            Auto-generate <strong style={{color:'#eef0f8'}}>$7,600/mo</strong> entries for Sep 2025 → today. Already-added months are skipped automatically.
           </div>
-          <button className="btn-primary" onClick={addMortgageMonths}
-            style={{ padding:'7px 16px', fontSize:'12px', whiteSpace:'nowrap', flexShrink:0 }}>
-            Add ${MORTGAGE_AMOUNT.toLocaleString()}/mo entries
-          </button>
         </div>
-      )}
+        <button className="btn-primary" onClick={addMortgageMonths}
+          style={{ padding:'7px 16px', fontSize:'12px', whiteSpace:'nowrap', flexShrink:0 }}>
+          Add mortgage entries
+        </button>
+      </div>
 
       {staged.length > 0 && (
         <div className="card">
