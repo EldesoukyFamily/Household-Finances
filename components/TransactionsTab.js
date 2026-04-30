@@ -1,19 +1,21 @@
 import { useState } from 'react'
 import { NON_RECURRING, fmt, catColor, ALL_CATEGORIES, toMonthLabel } from '../lib/constants'
 
-export default function TransactionsTab({ transactions, baseline, onUpdateCategory, onDelete, onToggleBusiness, months = [] }) {
+export default function TransactionsTab({ transactions, baseline, onUpdateCategory, onDelete, onToggleBusiness, onUpdateNote, months = [] }) {
   const ML = months.map(toMonthLabel)
-  const [view, setView]         = useState('expenses') // 'expenses' | 'income' | 'credits' | 'excluded'
-  const [q, setQ]               = useState('')
-  const [fCat, setFCat]         = useState('')
-  const [fMo, setFMo]           = useState('')
-  const [showNR, setShowNR]     = useState(false)
-  const [showBiz, setShowBiz]   = useState(false)
-  const [bizOnly, setBizOnly]   = useState(false)
+  const [view, setView]           = useState('expenses')
+  const [q, setQ]                 = useState('')
+  const [fCat, setFCat]           = useState('')
+  const [fMo, setFMo]             = useState('')
+  const [showNR, setShowNR]       = useState(false)
+  const [showBiz, setShowBiz]     = useState(false)
+  const [bizOnly, setBizOnly]     = useState(false)
   const [editingId, setEditingId] = useState(null)
+  const [editingNoteId, setEditingNoteId] = useState(null)
+  const [noteText, setNoteText]   = useState('')
   const [togglingId, setTogglingId] = useState(null)
-  const [sortBy, setSortBy]     = useState('date')
-  const [sortDir, setSortDir]   = useState('desc')
+  const [sortBy, setSortBy]       = useState('date')
+  const [sortDir, setSortDir]     = useState('desc')
 
   function toggleSort(col) {
     if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -113,6 +115,17 @@ export default function TransactionsTab({ transactions, baseline, onUpdateCatego
     await onUpdateCategory(t.id, t.category === 'Excluded' ? 'Other' : 'Excluded')
   }
 
+  function startNote(t) {
+    setEditingNoteId(t.id)
+    setNoteText(t.notes || '')
+  }
+
+  async function saveNote(id) {
+    await onUpdateNote(id, noteText)
+    setEditingNoteId(null)
+    setNoteText('')
+  }
+
   // Shared tab button style
   const tabBtn = (id, label, count, color) => (
     <button key={id} onClick={() => { setView(id); setEditingId(null) }}
@@ -192,7 +205,22 @@ export default function TransactionsTab({ transactions, baseline, onUpdateCatego
                   {rows.map(t => (
                     <tr key={t.id}>
                       <td style={{ fontFamily:'monospace', color:'#9499b8', fontSize:'11.5px' }}>{t.date}</td>
-                      <td style={{ maxWidth:'280px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={t.description}>{t.description}</td>
+                      <td style={{ maxWidth:'280px' }} title={t.description}>
+                        <div style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{t.description}</div>
+                        {editingNoteId === t.id ? (
+                          <div style={{ display:'flex', gap:'4px', marginTop:'4px' }}>
+                            <input autoFocus value={noteText} onChange={e=>setNoteText(e.target.value)}
+                              onKeyDown={e=>{ if(e.key==='Enter') saveNote(t.id); if(e.key==='Escape') setEditingNoteId(null) }}
+                              placeholder="Add a note..." style={{ fontSize:'11px', padding:'2px 6px', width:'180px', borderRadius:'4px' }} />
+                            <button onClick={()=>saveNote(t.id)} style={{ background:'#4f8ef7', color:'#fff', border:'none', borderRadius:'4px', padding:'2px 7px', cursor:'pointer', fontSize:'11px' }}>✓</button>
+                            <button onClick={()=>setEditingNoteId(null)} style={{ background:'none', border:'1px solid rgba(255,255,255,0.15)', color:'#9499b8', borderRadius:'4px', padding:'2px 7px', cursor:'pointer', fontSize:'11px' }}>✗</button>
+                          </div>
+                        ) : t.notes ? (
+                          <div onClick={()=>startNote(t)} style={{ fontSize:'11px', color:'#f5a623', marginTop:'3px', cursor:'pointer' }}>📝 {t.notes}</div>
+                        ) : (
+                          <div onClick={()=>startNote(t)} style={{ fontSize:'10px', color:'rgba(148,153,184,0.4)', marginTop:'2px', cursor:'pointer' }}>+ add note</div>
+                        )}
+                      </td>
                       <td style={{ fontFamily:'monospace', textAlign:'right', fontWeight:'600', color:'#2dd4a0' }}>+{fmt(parseFloat(t.amount))}</td>
                       <td style={{ color:'#9499b8', fontSize:'11.5px' }}>{t.account}</td>
                       <td>
@@ -412,11 +440,29 @@ export default function TransactionsTab({ transactions, baseline, onUpdateCatego
                   {rows.slice(0, 300).map(t => (
                     <tr key={t.id} style={ t.is_business ? { opacity:0.75, background:'rgba(245,166,35,0.04)' } : {} }>
                       <td style={{ fontFamily:'monospace', color:'#9499b8', fontSize:'11.5px', whiteSpace:'nowrap' }}>{t.date}</td>
-                      <td style={{ maxWidth:'260px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }} title={t.description}>
-                        {t.is_business && (
-                          <span style={{ fontSize:'10px', fontWeight:'600', color:'#f5a623', background:'rgba(245,166,35,0.15)', border:'1px solid rgba(245,166,35,0.3)', borderRadius:'4px', padding:'1px 5px', marginRight:'6px' }}>LLC</span>
+                      <td style={{ maxWidth:'260px' }} title={t.description}>
+                        <div style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                          {t.is_business && (
+                            <span style={{ fontSize:'10px', fontWeight:'600', color:'#f5a623', background:'rgba(245,166,35,0.15)', border:'1px solid rgba(245,166,35,0.3)', borderRadius:'4px', padding:'1px 5px', marginRight:'6px' }}>LLC</span>
+                          )}
+                          {t.description}
+                        </div>
+                        {editingNoteId === t.id ? (
+                          <div style={{ display:'flex', gap:'4px', marginTop:'4px' }}>
+                            <input autoFocus value={noteText} onChange={e=>setNoteText(e.target.value)}
+                              onKeyDown={e=>{ if(e.key==='Enter') saveNote(t.id); if(e.key==='Escape') setEditingNoteId(null) }}
+                              placeholder="Add a note..." style={{ fontSize:'11px', padding:'2px 6px', width:'180px', borderRadius:'4px' }} />
+                            <button onClick={()=>saveNote(t.id)} style={{ background:'#4f8ef7', color:'#fff', border:'none', borderRadius:'4px', padding:'2px 7px', cursor:'pointer', fontSize:'11px' }}>✓</button>
+                            <button onClick={()=>setEditingNoteId(null)} style={{ background:'none', border:'1px solid rgba(255,255,255,0.15)', color:'#9499b8', borderRadius:'4px', padding:'2px 7px', cursor:'pointer', fontSize:'11px' }}>✗</button>
+                          </div>
+                        ) : t.notes ? (
+                          <div onClick={()=>startNote(t)} style={{ fontSize:'11px', color:'#f5a623', marginTop:'3px', cursor:'pointer', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}
+                            title="Click to edit note">
+                            📝 {t.notes}
+                          </div>
+                        ) : (
+                          <div onClick={()=>startNote(t)} style={{ fontSize:'10px', color:'rgba(148,153,184,0.4)', marginTop:'2px', cursor:'pointer' }}>+ add note</div>
                         )}
-                        {t.description}
                       </td>
                       <td style={{ fontFamily:'monospace', textAlign:'right', fontWeight:'500' }}>{fmt(parseFloat(t.amount))}</td>
                       <td style={{ color:'#9499b8', fontSize:'11.5px' }}>{t.account}</td>

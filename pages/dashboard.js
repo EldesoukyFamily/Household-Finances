@@ -120,6 +120,11 @@ export default function Dashboard() {
     setTransactions(prev => prev.map(t => t.id === txnId ? { ...t, is_business: isBusiness } : t))
   }
 
+  async function updateNote(txnId, note) {
+    await supabase.from('transactions').update({ notes: note }).eq('id', txnId)
+    setTransactions(prev => prev.map(t => t.id === txnId ? { ...t, notes: note } : t))
+  }
+
   async function saveTransactions(newTxns) {
     const rows = newTxns.map(t => ({ ...t, household_id: householdId }))
     const { data } = await supabase.from('transactions').insert(rows).select()
@@ -167,7 +172,7 @@ export default function Dashboard() {
   // Derive sorted month list from actual transaction dates — no hardcoding needed
   const months = [...new Set(transactions.map(t => t.date?.slice(0, 7)).filter(Boolean))].sort()
 
-  const sharedProps = { transactions, baseline, bills, householdId, joinCode, months }
+  const sharedProps = { transactions, baseline, bills, householdId, joinCode, months, onUpdateNote: updateNote }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)' }}>
