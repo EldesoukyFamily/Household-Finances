@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
-import { NON_RECURRING, fmt, fmtS, catColor, ALL_CATEGORIES } from '../lib/constants'
+import { NON_RECURRING, fmt, fmtS, catColor, ALL_CATEGORIES, isAutoBusiness } from '../lib/constants'
 import DashboardTab from '../components/DashboardTab'
 import BaselineTab from '../components/BaselineTab'
 import TransactionsTab from '../components/TransactionsTab'
@@ -82,7 +82,46 @@ export default function Dashboard() {
       .select('*')
       .eq('household_id', householdId)
       .order('date', { ascending: false })
-    setTransactions(data || [])
+    const rows = data || []
+    const lyftToFix = rows.filter(t =>
+      isAutoBusiness(t.description || '') &&
+      (t.category !== 'Business / Professional' || !t.is_business)
+    )
+    const sevenElevenToFix = rows.filter(t => {
+      const d = (t.description || '').toUpperCase()
+      return (d.includes('7-ELEVEN') || d.includes('7 ELEVEN')) && t.category !== 'Groceries & Household'
+    })
+
+    if (lyftToFix.length || sevenElevenToFix.length) {
+      const ids = lyftToFix.map(t => t.id)
+      const sevenIds = sevenElevenToFix.map(t => t.id)
+      if (ids.length) {
+        await supabase
+          .from('transactions')
+          .update({ category: 'Business / Professional', is_business: true })
+          .in('id', ids)
+      }
+      if (sevenIds.length) {
+        await supabase
+          .from('transactions')
+          .update({ category: 'Groceries & Household' })
+          .in('id', sevenIds)
+      }
+
+      const fixedIds = new Set(ids)
+      const sevenFixedIds = new Set(sevenIds)
+      const fixedRows = rows.map(t =>
+        fixedIds.has(t.id)
+          ? { ...t, category: 'Business / Professional', is_business: true }
+          : sevenFixedIds.has(t.id)
+            ? { ...t, category: 'Groceries & Household' }
+            : t
+      )
+      setTransactions(fixedRows)
+      return
+    }
+
+    setTransactions(rows)
   }
 
   async function loadBaseline() {

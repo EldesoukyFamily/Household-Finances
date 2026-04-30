@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { autoCategorize, fmt, ALL_CATEGORIES } from '../lib/constants'
+import { autoCategorize, isAutoBusiness, fmt, ALL_CATEGORIES } from '../lib/constants'
 
 function parseAmt(str) {
   if (!str) return 0
@@ -211,6 +211,7 @@ function parseCSV(text, fname) {
         amount: Math.round(amount * 100) / 100,
         account,
         category: autoCategorize(desc),
+        is_business: isAutoBusiness(desc),
       })
     } catch (e) {}
   }
